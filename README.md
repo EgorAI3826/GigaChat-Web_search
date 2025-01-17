@@ -94,7 +94,7 @@ GigaChat-Web_Search/
 ```
 
 ---
-
+```
 ДЛЯ РАБОТЫ С МОДЕЛЬЮ GIGACHAT В LM Studio:
 
 Нужно настраивать секцию с Prompt Template (https://lmstudio.ai/docs/configuration/prompt-template)
@@ -113,3 +113,4 @@ After Assistant: <|message_sep|>
 
 Additional Settings
 Additional Stop Strings: [Empty/Not Set]
+```
