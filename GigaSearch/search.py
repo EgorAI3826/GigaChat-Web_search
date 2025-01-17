@@ -1,5 +1,4 @@
 import argparse
-import configparser
 import json
 import logging
 import random
@@ -14,6 +13,21 @@ from urllib.parse import urlparse
 
 APPNAME = 'LAISer'
 VERSION = '0.2'
+
+# Конфигурация
+BINDING_ADDRESS = '127.0.0.1'
+BINDING_PORT = 5000
+LMSTUDIO_IP = 'localhost'
+LMSTUDIO_PORT = 1234
+OLLAMA_BASE_URL = 'http://localhost:11434'
+OLLAMA_URL = 'http://localhost:11434/api/generate'
+OLLAMA_MODEL = 'llama2'
+API_TO_USE = 'lmstudio'  # Используем LM Studio
+SILENT = False
+SEARCH_RESULT_COUNT = 5
+NEWS_RESULT_COUNT = 3
+TRIM_WIKIPEDIA_SUMMARY = True
+TRIM_WIKIPEDIA_LINES = 3
 
 def search(search_query: str, num_results_to_return: int) -> list:
     try:
@@ -71,7 +85,7 @@ def _wikipedia_summary(page_title: str) -> list:
                 return [{'summary': trimmed_text}]
             else:
                 return [{'summary': text}]
-    return [{'summary': 'No summary available.'}]
+    return [{'summary': 'Нет доступного резюме.'}]
 
 def wikipedia(search_arg) -> str:
     def trim_url(url):
@@ -85,21 +99,21 @@ def wikipedia(search_arg) -> str:
         wiki_page_title = trim_url(search_result[0]['href'])
         summary = _wikipedia_summary(wiki_page_title)
         return summary
-    return [{'summary': 'No Wikipedia summary available.'}]
+    return [{'summary': 'Нет доступного резюме из Википедии.'}]
 
 def wait_between_queries(timeout_duration=1.0):
     time.sleep(timeout_duration)
 
 def perform_searches(search_query: str) -> list:
-    print("Getting Wikipedia summary...") if not SILENT else None
+    print("Получение резюме из Википедии...") if not SILENT else None
     wikipedia_summary = wikipedia(search_query)
     wikipedia_summary = format_llama_request(wikipedia_summary, "wikipedia")
     wait_between_queries()
-    print("Getting search results...") if not SILENT else None
+    print("Получение результатов поиска...") if not SILENT else None
     search_result = search(search_query, SEARCH_RESULT_COUNT)
     search_result = format_llama_request(search_result, "search")
     wait_between_queries()
-    print("Getting news results...") if not SILENT else None
+    print("Получение новостей...") if not SILENT else None
     news_result = news(search_query, NEWS_RESULT_COUNT)
     news_result = format_llama_request(news_result, "news")
     wait_between_queries()
@@ -116,8 +130,8 @@ def _is_llama_online() -> bool:
             response = requests.get(OLLAMA_BASE_URL)
             if response.status_code == 200 and response.text == 'Ollama is running':
                 return True
-        elif API_TO_USE == 'llama.cpp':
-            response = requests.get(f"http://{LLAMA_IP}:{LLAMA_PORT}/health")
+        elif API_TO_USE == 'lmstudio':
+            response = requests.get(f"http://{LMSTUDIO_IP}:{LMSTUDIO_PORT}/health")
             if response.status_code == 200:
                 return True
     except Exception as e:
@@ -135,15 +149,15 @@ def feed_the_llama(query: str) -> str:
             "prompt": query,
             "stream": False
         }
-    elif API_TO_USE == 'llama.cpp':
-        url = f"http://{LLAMA_IP}:{LLAMA_PORT}/v1/chat/completions"
+    elif API_TO_USE == 'lmstudio':
+        url = f"http://{LMSTUDIO_IP}:{LMSTUDIO_PORT}/v1/chat/completions"
         headers = {
             "Content-Type": "application/json"
         }
         data = {
             "model": "ai-sage/gigachat-20b-a3b-instruct",
             "messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "Ты помощник для поиска в интернете."},
                 {"role": "user", "content": query}
             ],
             "temperature": 0.7,
@@ -153,7 +167,7 @@ def feed_the_llama(query: str) -> str:
     else:
         return {
             "success": False,
-            "content": "Invalid API type."
+            "content": "Неверный тип API."
         }
 
     try:
@@ -165,7 +179,7 @@ def feed_the_llama(query: str) -> str:
                     "success": True,
                     "content": response_json['response']
                 }
-            elif API_TO_USE == 'llama.cpp':
+            elif API_TO_USE == 'lmstudio':
                 return {
                     "success": True,
                     "content": response_json['choices'][0]['message']['content']
@@ -187,33 +201,33 @@ def feed_the_llama(query: str) -> str:
 
 def format_llama_request(data: list, data_source: str) -> str:
     if data_source == "search":
-        search_result = "Web search results:\n```\n"
+        search_result = "Результаты поиска в интернете:\n```\n"
         for entry in data:
             title = entry['title']
             url = entry['href']
             meta = entry['body']
-            search_result = f"{search_result}Page title: {title}\n"
+            search_result = f"{search_result}Заголовок страницы: {title}\n"
             search_result = f"{search_result}URL: {url}\n"
-            search_result = f"{search_result}Page meta: {meta}\n"
+            search_result = f"{search_result}Мета-описание: {meta}\n"
             search_result = f"{search_result}\n"
         search_result = f"{search_result}```\n"
         return search_result
     elif data_source ==  "news":
-        news_result = "News search results:\n```\n"
+        news_result = "Результаты поиска новостей:\n```\n"
         for entry in data:
             title = entry['title']
             url = entry['url']
             meta = entry['body']
             source = entry['source']
-            news_result = f"{news_result}Page title: {title}\n"
+            news_result = f"{news_result}Заголовок страницы: {title}\n"
             news_result = f"{news_result}URL: {url}\n"
-            news_result = f"{news_result}Page meta: {meta}\n"
-            news_result = f"{news_result}News source: {source}\n"
+            news_result = f"{news_result}Мета-описание: {meta}\n"
+            news_result = f"{news_result}Источник новости: {source}\n"
             news_result = f"{news_result}\n"
         news_result = f"{news_result}```\n"
         return news_result
     elif data_source ==  "wikipedia":
-        wikipedia_summary = "Wikipedia:\n```\n"
+        wikipedia_summary = "Википедия:\n```\n"
         summary_data = data[0]['summary']
         wikipedia_summary = f"{wikipedia_summary}{summary_data}\n"
         wikipedia_summary = f"{wikipedia_summary}```\n"
@@ -223,12 +237,12 @@ def format_llama_request(data: list, data_source: str) -> str:
             dictionary = x
             if 'reply' in dictionary:
                 dict_reply = dictionary['reply']
-                print(f"Reply:\n{dict_reply}\n")
+                print(f"Ответ:\n{dict_reply}\n")
             if 'op' in dictionary:
                 dict_op = dictionary['op']
-                print(f"Original post:\n{dict_op}\n")
+                print(f"Оригинальный пост:\n{dict_op}\n")
     else:
-        print("Error: invalid data source")
+        print("Ошибка: неверный источник данных")
 
 def format_sources(collected_source_links: list) -> str:
     global source_links
@@ -266,14 +280,13 @@ def process_search_query(search_query: str) -> str:
 
 def generate_llamatize_text(search_query: str, search_data: str) -> str:
     llamatize = (
-        f"I performed a web search for `{search_query}`.\n"
-        f"Formulate a response based upon my search results:\n\n"
+        f"Я выполнил поиск в интернете по запросу `{search_query}`.\n"
+        f"Сформулируй ответ на основе моих результатов поиска:\n\n"
         f"{search_data}\n"
-        f"In addition, separately answer my question of "
+        f"Кроме того, ответь на мой вопрос "
         f"`{search_query}` "
-        f"directly without considering the information I provided "
-        f"previously. Finally, "
-        f"provide a summary which considers both of your answers.\n"
+        f"напрямую, не учитывая предоставленную мной информацию. "
+        f"Наконец, предоставь резюме, которое учитывает оба твоих ответа.\n"
     )
     return llamatize
 
@@ -281,7 +294,7 @@ def process_and_display_results(search_query: str) -> str:
     if _is_llama_online():
         search_data = process_search_query(search_query)
         llamatize = generate_llamatize_text(search_query, search_data)
-        print("Feeding the llama... ^°π°^") if not SILENT else None
+        print("Кормление ламы... ^°π°^") if not SILENT else None
         answer = feed_the_llama(llamatize)
         if answer["success"] == False:
             return answer["content"]
@@ -290,8 +303,8 @@ def process_and_display_results(search_query: str) -> str:
             return answer
     else:
         error_msg = (
-            f"{API_TO_USE} server is offline or status is not 'ok'.\n"
-            f"Please check your {API_TO_USE} settings.\n"
+            f"Сервер {API_TO_USE} выключен или его статус не 'ok'.\n"
+            f"Пожалуйста, проверьте настройки {API_TO_USE}.\n"
         )
         print(error_msg)
         return error_msg
@@ -305,11 +318,11 @@ def web_input(search_query: str) -> str:
         "</div>\n"
         f"{sources}"
     )
-    print("Returning result...")
+    print("Возвращаю результат...")
     return answer_content
 
 def web_server() -> None:
-    print(f"Starting server at: http://{BINDING_ADDRESS}:{BINDING_PORT}")
+    print(f"Запуск сервера по адресу: http://{BINDING_ADDRESS}:{BINDING_PORT}")
     app = Flask(__name__)
     app.name = f"{APPNAME} v{VERSION}"
     @app.route('/', methods=['GET', 'POST'])
@@ -319,60 +332,30 @@ def web_server() -> None:
     def web_search():
         start_time = time.time()
         question = request.form['input_text']
-        print(f"━━━━━━━━┫ Received web request: {question}")
+        print(f"━━━━━━━━┫ Получен веб-запрос: {question}")
         if lock.locked():
-            error_msg = "Sorry, I can only handle one request at a time and I'm currently busy."
+            error_msg = "Извините, я могу обрабатывать только один запрос за раз и сейчас занят."
             return jsonify({'result': error_msg})
         with lock:
             answer = web_input(question)
         end_time = time.time()
-        print(f"Completed in {end_time - start_time:.2f} seconds.")
+        print(f"Завершено за {end_time - start_time:.2f} секунд.")
         return jsonify({'result': answer})
     app.run(host=BINDING_ADDRESS, port=BINDING_PORT)
 
 def cli(search_query: str) -> None:
     answer = process_and_display_results(search_query)
-    print("━━━━━━━━┫ ANSWER") if not SILENT else None
+    print("━━━━━━━━┫ ОТВЕТ") if not SILENT else None
     print(answer)
     sources = format_sources(source_links)
-    print("\nSOURCES:")
+    print("\nИСТОЧНИКИ:")
     print(sources)
 
-def load_config() -> None:
-    parser = configparser.ConfigParser()
-    parser.read('settings.ini')
-    global BINDING_ADDRESS
-    global BINDING_PORT
-    global LLAMA_IP
-    global LLAMA_PORT
-    global OLLAMA_BASE_URL
-    global OLLAMA_URL
-    global OLLAMA_MODEL
-    global API_TO_USE
-    global SILENT
-    global SEARCH_RESULT_COUNT
-    global NEWS_RESULT_COUNT
-    global TRIM_WIKIPEDIA_SUMMARY
-    global TRIM_WIKIPEDIA_LINES
-    BINDING_ADDRESS = parser.get('laiser', 'BINDING_ADDRESS')
-    BINDING_PORT = parser.get('laiser', 'BINDING_PORT')
-    LLAMA_IP = parser.get('llamaCPP', 'LLAMA_IP')
-    LLAMA_PORT = parser.get('llamaCPP', 'LLAMA_PORT')
-    OLLAMA_BASE_URL = parser.get('ollama', 'OLLAMA_BASE_URL')
-    OLLAMA_URL = parser.get('ollama', 'OLLAMA_URL')
-    OLLAMA_MODEL = parser.get('ollama', 'OLLAMA_MODEL')
-    API_TO_USE = parser.get('default_API', 'API_TO_USE')
-    SILENT = parser.getboolean('status_messages', 'silent')
-    SEARCH_RESULT_COUNT = parser.getint('advanced', 'SEARCH_RESULT_COUNT')
-    NEWS_RESULT_COUNT = parser.getint('advanced', 'NEWS_RESULT_COUNT')
-    TRIM_WIKIPEDIA_SUMMARY = parser.getboolean('advanced', 'TRIM_WIKIPEDIA_SUMMARY')
-    TRIM_WIKIPEDIA_LINES = parser.getint('advanced', 'TRIM_WIKIPEDIA_LINES')
-
 def arguments() -> str:
-    parser = argparse.ArgumentParser(description=f"{APPNAME} v{VERSION} - Local AI Search")
+    parser = argparse.ArgumentParser(description=f"{APPNAME} v{VERSION} - Локальный поиск с ИИ")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--query', '-q', type=str, help='The query to search for')
-    group.add_argument('--server', '-s', action='store_true', help='Connect to the server')
+    group.add_argument('--query', '-q', type=str, help='Запрос для поиска')
+    group.add_argument('--server', '-s', action='store_true', help='Подключиться к серверу')
     args = parser.parse_args()
     server = False
     if args.query:
@@ -381,11 +364,10 @@ def arguments() -> str:
     elif args.server:
         return False
     else:
-        parser.error("Either --query or --server must be specified.")
+        parser.error("Необходимо указать либо --query, либо --server.")
 
 if __name__ == "__main__":
     get_arguments = arguments()
-    load_config()
     lock = threading.Lock()
     global SEARCH_TYPE
     SEARCH_TYPE = ""
@@ -393,7 +375,7 @@ if __name__ == "__main__":
     source_links = []
     global results
     results = ""
-    print(f"Using {API_TO_USE}") if not SILENT else None
+    print(f"Используется {API_TO_USE}") if not SILENT else None
     if not get_arguments:
         SEARCH_TYPE = "web"
         web_server()
@@ -401,10 +383,10 @@ if __name__ == "__main__":
         SEARCH_TYPE = "cli"
         search_query = get_arguments
         if not search_query:
-            sys.exit("Enter a search query enclosed in quotes.")
+            sys.exit("Введите поисковый запрос в кавычках.")
         else:
             start_time = time.time()
             cli(search_query)
             source_links = []
             end_time = time.time()
-            print(f"Completed in {end_time - start_time:.2f} seconds.") if not SILENT else None
+            print(f"Завершено за {end_time - start_time:.2f} секунд.") if not SILENT else None
