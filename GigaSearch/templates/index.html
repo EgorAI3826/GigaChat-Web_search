@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>LAISer Search</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="static/favicon.ico" type="image/x-icon" />
+</head>
+<body>
+
+    <!-- message container -->
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages"></div>
+    </div>
+ 
+    <!-- input form -->
+    <form id="user-input" method="post" action="#">
+      <div class="message-input-container">
+        <!-- text input area -->
+        <textarea id="input_text" name="input_text" class="message-input"
+        oninput="autoExpand(this)" placeholder="Search..."></textarea>
+        <!-- send button -->
+        <button type="button" class="send-button">
+          <div class="send-icon">⊛</div>
+          <div class="loader"><div class="pupil"></div></div>
+        </button>
+      </div>
+    </form>
+
+<script src="/static/functions.js"></script>
+
+</body>
+</html>
