@@ -87,7 +87,6 @@ python search.py -q "Какие новости в мире технологий?
 ```
 GigaChat-Web_Search/
 ├── search.py             # Основной скрипт для поиска и взаимодействия
-├── settings.ini          # Файл конфигурации
 ├── requirements.txt      # Список зависимостей
 ├── templates             # HTML файл
 └── README.md             # Документация
